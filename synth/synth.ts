@@ -11425,7 +11425,10 @@ export class Synth {
             const data: Float32Array = synth.tempMonoInstrumentSampleBuffer!;
             const wave: Float32Array = instrumentState.wave!;
             const volumeScale: number = instrumentState.volumeScale;
-            const waveLength: number = (aliases && instrumentState.type == 8) ? wave.length : wave.length - 1;
+
+            // For all but aliasing custom chip, the first sample is duplicated at the end, so don't double-count it.
+            const waveLength: number = (aliases && instrumentState.type == InstrumentType.customChipWave) ? wave.length : wave.length - 1;
+
             let chipWaveLoopEnd: number = Math.max(0, Math.min(waveLength, instrumentState.chipWaveLoopEnd));
             let chipWaveLoopStart: number = Math.max(0, Math.min(chipWaveLoopEnd - 1, instrumentState.chipWaveLoopStart));
 			// @TODO: This is where to set things up for the release loop mode.
@@ -11751,7 +11754,7 @@ export class Synth {
         const wave: Float32Array = instrumentState.wave!;
         const volumeScale = instrumentState.volumeScale;
 
-        const waveLength = (aliases && instrumentState.type == 8) ? wave.length : wave.length - 1;
+        const waveLength = (aliases && instrumentState.type == InstrumentType.customChipWave) ? wave.length : wave.length - 1;
 
         const unisonSign: number = tone.specialIntervalExpressionMult * instrumentState.unisonSign;
         if (instrumentState.unisonVoices == 1 && instrumentState.unisonSpread == 0 && !instrumentState.chord!.customInterval) tone.phases[1] = tone.phases[0];
