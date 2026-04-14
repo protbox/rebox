@@ -4,6 +4,7 @@ import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { Prompt } from "./Prompt";
 import { SongDocument } from "./SongDocument";
 import { Config } from "../synth/SynthConfig";
+import { modulatorStrings } from "./ModulatorStrings";
 
 const { button, div, p, h2, h3 } = HTML;
 
@@ -554,9 +555,10 @@ export class TipPrompt implements Prompt {
 					let modNum: number = +type[type.length - 1];
 					let modulator: number = _doc.song.channels[_doc.channel].instruments[_doc.getCurrentInstrument()].modulators[modNum];
 					let pList: HTMLParagraphElement[] = [];
-					for (let s: number = 0; s < Config.modulators[modulator].promptDesc.length; s++) {
+					const promptEntry = modulatorStrings[Config.modulators[modulator].name as keyof typeof modulatorStrings];
+					for (let s: number = 0; s < promptEntry.promptDesc.length; s++) {
 						pList.push(p(
-							Config.modulators[modulator].promptDesc[s]
+							promptEntry.promptDesc[s]
 								.replace("$LO", "" + Config.modulators[modulator].convertRealFactor)
 								.replace("$MID", "" + (Config.modulators[modulator].convertRealFactor + Config.modulators[modulator].maxRawVol / 2))
 								.replace("$HI", "" + (Config.modulators[modulator].convertRealFactor + Config.modulators[modulator].maxRawVol))
@@ -566,7 +568,7 @@ export class TipPrompt implements Prompt {
 					// Last element for mod settings is just some miscellaneous data for nerds like me.
 					pList[pList.length-1].style.setProperty("color", "var(--secondary-text)");
 					message = div(
-						h2(Config.modulators[modulator].promptName),
+						h2(promptEntry.promptName),
 						pList,
 					);
 					break;
