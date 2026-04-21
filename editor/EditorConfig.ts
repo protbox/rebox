@@ -23,7 +23,7 @@ export function prettyNumber(value: number): string {
 }
 
 export class EditorConfig {
-    public static readonly version: string = "21.4.2026";
+    public static readonly version: string = "1.0.0";
     public static readonly versionDisplayName: string = "Rebox " + EditorConfig.version;
 
     public static readonly releaseNotesURL: string = "./patch_notes.html";
