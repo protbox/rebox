@@ -10,11 +10,12 @@ import { ChangeGroup } from "./Change";
 import { removeDuplicatePatterns, ChangeSong, ChangeReplacePatterns } from "./changes";
 import { AnalogousDrum, analogousDrumMap, MidiChunkType, MidiFileFormat, MidiEventType, MidiControlEventMessage, MidiMetaEventMessage, MidiRegisteredParameterNumberMSB, MidiRegisteredParameterNumberLSB, midiVolumeToVolumeMult, midiExpressionToVolumeMult } from "./Midi";
 import { ArrayBufferReader } from "./ArrayBufferReader";
+import { LOCAL_SAMPLE_URL_PREFIX, storeLocalSample, hasLocalSample, generateLocalSampleId, base64ToArrayBuffer } from "./LocalSampleStorage";
 
-	const {button, p, div, h2, input, select, option} = HTML;
+const {button, p, div, h2, input, select, option} = HTML;
 
 export class ImportPrompt implements Prompt {
-		private readonly _fileInput: HTMLInputElement = input({type: "file", accept: ".json,application/json,.mid,.midi,audio/midi,audio/x-midi"});
+		private readonly _fileInput: HTMLInputElement = input({type: "file", accept: ".rebox,.json,application/json,.mid,.midi,audio/midi,audio/x-midi"});
 		private readonly _cancelButton: HTMLButtonElement = button({class: "cancelButton"});
 		private readonly _modeImportSelect: HTMLSelectElement = select({style: "width: 100%;"},
 			option({value: "auto"}, "Auto-detect mode (for json)"),
@@ -64,7 +65,19 @@ export class ImportPrompt implements Prompt {
 		if (!file) return;
 			
 		const extension: string = file.name.slice((file.name.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
-		if (extension == "json") {
+		if (extension == "rebox") {
+			const reader: FileReader = new FileReader();
+			reader.addEventListener("load", async (event: Event): Promise<void> => {
+				try {
+					await this._loadReboxFile(<string>reader.result);
+				} catch (e) {
+					console.error("Failed to load .rebox file:", e);
+					alert("Failed to load .rebox file. See console for details.");
+					this._close();
+				}
+			});
+			reader.readAsText(file);
+		} else if (extension == "json") {
 			const reader: FileReader = new FileReader();
 			reader.addEventListener("load", (event: Event): void => {
 				this._doc.prompt = null;
@@ -84,6 +97,48 @@ export class ImportPrompt implements Prompt {
 			console.error("Unrecognized file extension.");
 			this._close();
 		}
+	}
+
+	private async _loadReboxFile(fileContents: string): Promise<void> {
+		const reboxFile: any = JSON.parse(fileContents);
+		if (reboxFile == null || reboxFile["reboxVersion"] == null) {
+			throw new Error("Not a valid .rebox file (missing reboxVersion).");
+		}
+		const song: any = reboxFile["song"];
+		const localSamples: { [id: string]: { filename: string; data: string } } = reboxFile["localSamples"] || {};
+		const idRemapping: { [oldId: string]: string } = {};
+		for (const oldId of Object.keys(localSamples)) {
+			const entry = localSamples[oldId];
+			if (entry == null || entry.data == null || entry.filename == null) continue;
+			let targetId: string = oldId;
+			if (await hasLocalSample(oldId)) {
+				targetId = generateLocalSampleId();
+			}
+			const buffer: ArrayBuffer = base64ToArrayBuffer(entry.data);
+			await storeLocalSample(targetId, buffer, entry.filename);
+			if (targetId !== oldId) {
+				idRemapping[oldId] = targetId;
+			}
+		}
+		if (Object.keys(idRemapping).length > 0 && Array.isArray(song["customSamples"])) {
+			const remapped: string[] = [];
+			for (const url of song["customSamples"]) {
+				let newUrl: string = url;
+				for (const oldId of Object.keys(idRemapping)) {
+					const oldUrl: string = LOCAL_SAMPLE_URL_PREFIX + oldId;
+					if (url.indexOf(oldUrl) !== -1) {
+						newUrl = url.split(oldUrl).join(LOCAL_SAMPLE_URL_PREFIX + idRemapping[oldId]);
+						break;
+					}
+				}
+				remapped.push(newUrl);
+			}
+			song["customSamples"] = remapped;
+		}
+		const songJsonString: string = JSON.stringify(song);
+		this._doc.prompt = null;
+		this._doc.goBackToStart();
+		this._doc.record(new ChangeSong(this._doc, songJsonString, this._modeImportSelect.value), true, true);
 	}
 		
 	private _parseMidiFile(buffer: ArrayBuffer): void {

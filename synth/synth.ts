@@ -5986,8 +5986,8 @@ export class Song {
             // uses an url like `https://example.com`, this will
             // result in an empty name here.
             let name: string;
-            if (urlSliced.startsWith("ultrabox-local://")) {
-                const id: string = urlSliced.slice("ultrabox-local://".length);
+            if (urlSliced.startsWith("rebox-local://")) {
+                const id: string = urlSliced.slice("rebox-local://".length);
                 const filename: string | null = getLocalSampleFilename(id);
                 name = filename != null ? filename : id;
             } else if (OFFLINE) {

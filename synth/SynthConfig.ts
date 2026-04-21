@@ -342,9 +342,9 @@ export async function startLoadingSample(url: string, chipWaveIndex: number, pre
             url = joined;
         }
     }
-    const fetchPromise: Promise<Response> = url.startsWith("ultrabox-local://")
+    const fetchPromise: Promise<Response> = url.startsWith("rebox-local://")
         ? (async () => {
-            const id = url.slice("ultrabox-local://".length);
+            const id = url.slice("rebox-local://".length);
             const data = await getLocalSample(id);
             if (data == null) return new Response(null, { status: 404, statusText: "Local sample not found" });
             return new Response(data, { status: 200 });

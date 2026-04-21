@@ -1,9 +1,9 @@
-const DB_NAME = "ultrabox-local-samples";
+const DB_NAME = "rebox-local-samples";
 const STORE_NAME = "samples";
 const DB_VERSION = 1;
-const LOCALSTORAGE_PREFIX = "ultrabox-local-name-";
+const LOCALSTORAGE_PREFIX = "rebox-local-name-";
 
-export const LOCAL_SAMPLE_URL_PREFIX = "ultrabox-local://";
+export const LOCAL_SAMPLE_URL_PREFIX = "rebox-local://";
 
 interface StoredSample {
     data: ArrayBuffer;
@@ -61,6 +61,30 @@ export async function getLocalSample(id: string): Promise<ArrayBuffer | null> {
     });
 }
 
+export async function getLocalSampleWithFilename(id: string): Promise<{ data: ArrayBuffer; filename: string } | null> {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const request = tx.objectStore(STORE_NAME).get(id);
+        request.onsuccess = () => {
+            const record = request.result as StoredSample | undefined;
+            if (record == null) { resolve(null); return; }
+            resolve({ data: record.data, filename: record.filename });
+        };
+        request.onerror = () => reject(request.error);
+    });
+}
+
+export async function hasLocalSample(id: string): Promise<boolean> {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const request = tx.objectStore(STORE_NAME).getKey(id);
+        request.onsuccess = () => resolve(request.result != null);
+        request.onerror = () => reject(request.error);
+    });
+}
+
 export function getLocalSampleFilename(id: string): string | null {
     try {
         return localStorage.getItem(LOCALSTORAGE_PREFIX + id);
@@ -71,4 +95,24 @@ export function getLocalSampleFilename(id: string): string | null {
 
 export function generateLocalSampleId(): string {
     return "ls-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return btoa(binary);
+}
+
+export function base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
 }
