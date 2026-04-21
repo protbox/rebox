@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2022 John Nesky and contributing authors, distributed under the MIT license, see accompanying the LICENSE.md file.
 
 import {Scale, Config} from "../synth/SynthConfig";
-import {ColorConfig} from "../editor/ColorConfig";
+//import {ColorConfig} from "../editor/ColorConfig";
 
 export class Preferences {
 	public static readonly defaultVisibleOctaves: number = 3;
@@ -55,8 +55,8 @@ export class Preferences {
 		this.enableNotePreview = window.localStorage.getItem("enableNotePreview") != "false";
 		this.showFifth = window.localStorage.getItem("showFifth") == "true";
 		this.notesOutsideScale = window.localStorage.getItem("notesOutsideScale") == "true";
-		this.showLetters = window.localStorage.getItem("showLetters") == "true";
-		this.showChannels = window.localStorage.getItem("showChannels") == "true";
+		this.showLetters = window.localStorage.getItem("showLetters") != "false";
+		this.showChannels = window.localStorage.getItem("showChannels") != "false";
 		this.showScrollBar = window.localStorage.getItem("showScrollBar") != "false";
 		this.alwaysFineNoteVol = window.localStorage.getItem("alwaysFineNoteVol") == "true";
 		this.displayVolumeBar = window.localStorage.getItem("displayVolumeBar") != "false";
@@ -78,11 +78,11 @@ export class Preferences {
 		this.showDescription = window.localStorage.getItem("showDescription") != "false";
 		this.showInstrumentScrollbars = window.localStorage.getItem("showInstrumentScrollbars") == "true";
 		this.closePromptByClickoff = window.localStorage.getItem("closePromptByClickoff") == "true";
-		this.frostedGlassBackground = window.localStorage.getItem("frostedGlassBackground") == "true";
+		this.frostedGlassBackground = window.localStorage.getItem("frostedGlassBackground") != "false";
 		this.keyboardLayout = window.localStorage.getItem("keyboardLayout") || "pianoTransposingC";
 		this.bassOffset = (+(<any>window.localStorage.getItem("bassOffset"))) || 0;
-		this.layout = window.localStorage.getItem("layout") || "small";
-		this.colorTheme = window.localStorage.getItem("colorTheme") || ColorConfig.defaultTheme;
+		this.layout = window.localStorage.getItem("layout") || "wide";
+		this.colorTheme = window.localStorage.getItem("colorTheme") || "jummbox classic";
 		this.customTheme = window.localStorage.getItem("customTheme");
         this.customTheme2 = window.localStorage.getItem("customTheme2");
 		this.visibleOctaves = ((<any>window.localStorage.getItem("visibleOctaves")) >>> 0) || Preferences.defaultVisibleOctaves;
