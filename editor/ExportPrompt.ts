@@ -9,6 +9,7 @@ import { Prompt } from "./Prompt";
 import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { ArrayBufferWriter } from "./ArrayBufferWriter";
 import { MidiChunkType, MidiFileFormat, MidiControlEventMessage, MidiEventType, MidiMetaEventMessage, MidiRegisteredParameterNumberMSB, MidiRegisteredParameterNumberLSB, volumeMultToMidiVolume, volumeMultToMidiExpression, defaultMidiPitchBend, defaultMidiExpression } from "./Midi";
+import { LOCAL_SAMPLE_URL_PREFIX, getLocalSampleWithFilename, arrayBufferToBase64 } from "./LocalSampleStorage";
 
 const { button, div, h2, input, select, option } = HTML;
 
@@ -58,7 +59,7 @@ export class ExportPrompt implements Prompt {
         option({ value: "mp3" }, "Export to .mp3 file."),
 	//option({ value: "ogg" }, "Export to .ogg file."),
         option({ value: "midi" }, "Export to .mid file."),
-        option({ value: "json" }, "Export to .json file."),
+        option({ value: "rebox" }, "Export to .rebox file."),
         option({ value: "html" }, "Export to .html file."),
     );
     private readonly _removeWhitespace: HTMLInputElement = input({ type: "checkbox" });
@@ -144,7 +145,7 @@ export class ExportPrompt implements Prompt {
             this._removeWhitespace.checked = lastExportWhitespace;
         }
 
-        if (this._formatSelect.value == "json") {
+        if (this._formatSelect.value == "rebox") {
             this._removeWhitespaceDiv.style.display = "block";
         } else {
             this._removeWhitespaceDiv.style.display = "none";
@@ -160,7 +161,7 @@ export class ExportPrompt implements Prompt {
         this._enableOutro.addEventListener("click", () => { (this._computedSamplesLabel.firstChild as Text).textContent = this.samplesToTime(this._doc.synth.getTotalSamples(this._enableIntro.checked, this._enableOutro.checked, +this._loopDropDown.value - 1)); });
         this._enableIntro.addEventListener("click", () => { (this._computedSamplesLabel.firstChild as Text).textContent = this.samplesToTime(this._doc.synth.getTotalSamples(this._enableIntro.checked, this._enableOutro.checked, +this._loopDropDown.value - 1)); });
         this._loopDropDown.addEventListener("change", () => { (this._computedSamplesLabel.firstChild as Text).textContent = this.samplesToTime(this._doc.synth.getTotalSamples(this._enableIntro.checked, this._enableOutro.checked, +this._loopDropDown.value - 1)); });
-        this._formatSelect.addEventListener("change", () => { if (this._formatSelect.value == "json") { this._removeWhitespaceDiv.style.display = "block"; } else {  this._removeWhitespaceDiv.style.display = "none"; } });
+        this._formatSelect.addEventListener("change", () => { if (this._formatSelect.value == "rebox") { this._removeWhitespaceDiv.style.display = "block"; } else {  this._removeWhitespaceDiv.style.display = "none"; } });
         this.container.addEventListener("keydown", this._whenKeyPressed);
 
         this._fileName.value = _doc.song.title;
@@ -245,9 +246,9 @@ export class ExportPrompt implements Prompt {
                 this.outputStarted = true;
                 this._exportToMidi();
                 break;
-            case "json":
+            case "rebox":
                 this.outputStarted = true;
-                this._exportToJson();
+                this._exportToRebox();
                 break;
             case "html":
                 this._exportToHtml();
@@ -889,13 +890,42 @@ export class ExportPrompt implements Prompt {
 		this._close();
 	}
 	
-	private _exportToJson(): void {
-		const jsonObject: Object = this._doc.song.toJsonObject(this._enableIntro.checked, Number(this._loopDropDown.value), this._enableOutro.checked);
-        let whiteSpaceParam: string | undefined = this._removeWhitespace.checked ? undefined : '\t';
-		const jsonString: string = JSON.stringify(jsonObject, null, whiteSpaceParam);
-		const blob: Blob = new Blob([jsonString], {type: "application/json"});
-		save(blob, this._fileName.value.trim() + ".json");
-		this._close();
+	private async _exportToRebox(): Promise<void> {
+        try {
+            const jsonObject: any = this._doc.song.toJsonObject(this._enableIntro.checked, Number(this._loopDropDown.value), this._enableOutro.checked);
+            const localSamples: { [id: string]: { filename: string; data: string } } = {};
+            const customSamples: string[] | undefined = jsonObject["customSamples"];
+            if (customSamples != null) {
+                for (const url of customSamples) {
+                    const prefixIndex: number = url.indexOf(LOCAL_SAMPLE_URL_PREFIX);
+                    if (prefixIndex === -1) continue;
+                    const id: string = url.slice(prefixIndex + LOCAL_SAMPLE_URL_PREFIX.length);
+                    if (localSamples[id] != null) continue;
+                    const record = await getLocalSampleWithFilename(id);
+                    if (record == null) {
+                        console.warn("Local sample not found in storage, skipping: " + id);
+                        continue;
+                    }
+                    localSamples[id] = {
+                        filename: record.filename,
+                        data: arrayBufferToBase64(record.data),
+                    };
+                }
+            }
+            const reboxFile: Object = {
+                "reboxVersion": 1,
+                "song": jsonObject,
+                "localSamples": localSamples,
+            };
+            const whiteSpaceParam: string | undefined = this._removeWhitespace.checked ? undefined : '\t';
+            const jsonString: string = JSON.stringify(reboxFile, null, whiteSpaceParam);
+            const blob: Blob = new Blob([jsonString], { type: "application/json" });
+            save(blob, this._fileName.value.trim() + ".rebox");
+        } catch (e) {
+            console.error("Failed to export .rebox file:", e);
+            alert("Failed to export .rebox file. See console for details.");
+        }
+        this._close();
     }
 
     private _exportToHtml(): void {
