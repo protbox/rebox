@@ -4,6 +4,7 @@ import { clamp, parseFloatWithDefault, parseIntWithDefault } from "../synth/synt
 import { ColorConfig } from "./ColorConfig";
 import { EditorConfig } from "./EditorConfig";
 import { SongDocument } from "./SongDocument";
+import { LOCAL_SAMPLE_URL_PREFIX, storeLocalSample, generateLocalSampleId, getLocalSampleFilename } from "./LocalSampleStorage";
 
 const { div, input, button, a, code, textarea, details, summary, span, ul, li, select, option, h2, p } = HTML;
 
@@ -41,9 +42,13 @@ export class AddSamplesPrompt {
     private readonly _addSampleButton: HTMLButtonElement = button({ style: "height: auto; min-height: var(--button-size);" }, "Add sample");
     private readonly _entryContainer: HTMLDivElement = div();
     private readonly _addMultipleSamplesButton: HTMLButtonElement = button({ style: "height: auto; min-height: var(--button-size); margin-left: 0.5em;" }, "Add multiple samples");
+    private readonly _addLocalFileButton: HTMLButtonElement = button({ style: "height: auto; min-height: var(--button-size); margin-left: 0.5em;" }, "Upload local file");
+    private readonly _localFileInput: HTMLInputElement = input({ type: "file", accept: "audio/*", multiple: true, style: "display: none;" });
     private readonly _addSamplesAreaBottom: HTMLDivElement = div({ style: "margin-top: 0.5em;" },
         this._addSampleButton,
-        this._addMultipleSamplesButton
+        this._addMultipleSamplesButton,
+        this._addLocalFileButton,
+        this._localFileInput
     );
     private readonly _instructionsLink: HTMLAnchorElement = a({ href: "#", style:"color:var(--loop-accent, red); font-weight:bold;"}, "> Click Here for instructions on adding samples <");
     private readonly _description: HTMLDivElement = div(
@@ -157,6 +162,8 @@ export class AddSamplesPrompt {
         this._addSampleButton.addEventListener("click", this._whenAddSampleClicked);
         this._addMultipleSamplesButton.addEventListener("click", this._whenAddMultipleSamplesClicked);
         this._bulkAddConfirmButton.addEventListener("click", this._whenBulkAddConfirmClicked);
+        this._addLocalFileButton.addEventListener("click", () => this._localFileInput.click());
+        this._localFileInput.addEventListener("change", this._whenLocalFilesPicked);
         this._okayButton.addEventListener("click", this._saveChanges);
         this._cancelButton.addEventListener("click", this._close);
         this._instructionsLink.addEventListener("click", this._whenInstructionsLinkClicked);
@@ -191,6 +198,36 @@ export class AddSamplesPrompt {
         window.location.hash = this._doc.song.toBase64String();
         // The prompt seems to get stuck if reloading is done too quickly.
         setTimeout(() => { location.reload(); }, 50);
+    }
+
+    private _whenLocalFilesPicked = async (event: Event): Promise<void> => {
+        const element: HTMLInputElement = <HTMLInputElement>event.target;
+        const files: FileList | null = element.files;
+        if (files == null) return;
+        for (let i = 0; i < files.length; i++) {
+            if (this._entries.length >= this._maxSamples) break;
+            const file: File = files[i];
+            const id: string = generateLocalSampleId();
+            const arrayBuffer: ArrayBuffer = await file.arrayBuffer();
+            await storeLocalSample(id, arrayBuffer, file.name);
+            const url: string = LOCAL_SAMPLE_URL_PREFIX + id;
+            const entryIndex: number = this._entries.length;
+            this._entries.push({
+                url: url,
+                sampleRate: 44100,
+                rootKey: 60,
+                percussion: false,
+                chipWaveLoopStart: null,
+                chipWaveLoopEnd: null,
+                chipWaveStartOffset: null,
+                chipWaveLoopMode: null,
+                chipWavePlayBackwards: false,
+            });
+            this._entryOptionsDisplayStates[entryIndex] = false;
+        }
+        element.value = "";
+        this._reconfigureAddSampleButton();
+        this._render(true);
     }
 
     private _whenAddSampleClicked = (event: Event): void => {
@@ -617,6 +654,11 @@ export class AddSamplesPrompt {
     }
 
     private _getSampleName = (entry: SampleEntry): string => {
+        if (entry.url.startsWith(LOCAL_SAMPLE_URL_PREFIX)) {
+            const id: string = entry.url.slice(LOCAL_SAMPLE_URL_PREFIX.length);
+            const filename: string | null = getLocalSampleFilename(id);
+            return filename != null ? filename : "(local sample)";
+        }
         try {
             const parsedUrl: URL = new URL(entry.url);
             return decodeURIComponent(parsedUrl.pathname.replace(/^([^\/]*\/)+/, ""));

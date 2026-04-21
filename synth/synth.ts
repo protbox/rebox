@@ -6,6 +6,7 @@ import { scaleElementsByFactor, inverseRealFourierTransform } from "./FFT";
 import { Deque } from "./Deque";
 import { events } from "../global/Events";
 import { FilterCoefficients, FrequencyResponse, DynamicBiquadFilter, warpInfinityToNyquist } from "./filtering";
+import { getLocalSampleFilename } from "../editor/LocalSampleStorage";
 
 declare global {
     interface Window {
@@ -5985,7 +5986,11 @@ export class Song {
             // uses an url like `https://example.com`, this will
             // result in an empty name here.
             let name: string;
-            if (OFFLINE) {
+            if (urlSliced.startsWith("ultrabox-local://")) {
+                const id: string = urlSliced.slice("ultrabox-local://".length);
+                const filename: string | null = getLocalSampleFilename(id);
+                name = filename != null ? filename : id;
+            } else if (OFFLINE) {
                 //@ts-ignore
                 name = decodeURIComponent(parsedUrl.replace(/^([^\/]*\/)+/, ""));
             } else {

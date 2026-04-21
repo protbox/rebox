@@ -20,6 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { getLocalSample } from "../editor/LocalSampleStorage";
+
 export interface Dictionary<T> {
     [K: string]: T;
 }
@@ -340,7 +342,15 @@ export async function startLoadingSample(url: string, chipWaveIndex: number, pre
             url = joined;
         }
     }
-    fetch(url).then((response) => {
+    const fetchPromise: Promise<Response> = url.startsWith("ultrabox-local://")
+        ? (async () => {
+            const id = url.slice("ultrabox-local://".length);
+            const data = await getLocalSample(id);
+            if (data == null) return new Response(null, { status: 404, statusText: "Local sample not found" });
+            return new Response(data, { status: 200 });
+          })()
+        : fetch(url);
+    fetchPromise.then((response) => {
 	if (!response.ok) {
 	    // @TODO: Be specific with the error handling.
 	    sampleLoadingState.statusTable[chipWaveIndex] = SampleLoadingStatus.error;
